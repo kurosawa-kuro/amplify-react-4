@@ -1,7 +1,7 @@
 import { defineFunction } from '@aws-amplify/backend';
 
 export const customLog = defineFunction({
-  name: 'custom-log',
+  name: 'customLog',
   entry: './handler.ts',
   
   // 環境変数の設定

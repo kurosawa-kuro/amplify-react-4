@@ -328,6 +328,23 @@ const App = (): JSX.Element => {
     }
   };
 
+  const handleCustomButtonClick = async () => {
+    try {
+      await client.models.Log.create({
+        message: 'カスタムボタンがクリックされました',
+        timestamp: new Date().toISOString(),
+        level: 'INFO',
+        metadata: JSON.stringify({
+          source: 'custom-button',
+          action: 'click'
+        })
+      });
+      console.log('ログが正常に記録されました');
+    } catch (error) {
+      console.error('ログの記録に失敗しました:', error);
+    }
+  };
+
   return (
     <div className="app">
       <main className="container">
@@ -410,7 +427,7 @@ const App = (): JSX.Element => {
 
         <div style={{ textAlign: 'center', margin: '2rem 0' }}>
           <button
-            onClick={() => console.log("カスタムボタンがクリックされました")}
+            onClick={handleCustomButtonClick}
             className="todo-button"
             style={{ backgroundColor: 'var(--success)' }}
           >
