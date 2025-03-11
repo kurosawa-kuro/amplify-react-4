@@ -30,7 +30,6 @@ interface CategoryFormProps {
 
 interface DetailProps {
   onClose: () => void;
-  categories: Array<Schema["Category"]["type"]>;
 }
 
 interface MicropostDetailProps extends DetailProps {
@@ -109,7 +108,7 @@ const CategoryForm = ({ onSubmit, value, onChange }: CategoryFormProps): JSX.Ele
   </form>
 );
 
-const MicropostDetail = ({ micropost, onClose, categories }: MicropostDetailProps): JSX.Element => {
+const MicropostDetail = ({ micropost, onClose }: MicropostDetailProps): JSX.Element => {
   const [relatedCategories, setRelatedCategories] = useState<Array<Schema["Category"]["type"]>>([]);
 
   useEffect(() => {
@@ -120,12 +119,15 @@ const MicropostDetail = ({ micropost, onClose, categories }: MicropostDetailProp
       
       if (relations.data) {
         const categoryIds = relations.data.map(relation => relation.categoryId);
-        setRelatedCategories(categories.filter(category => categoryIds.includes(category.id)));
+        const categories = await client.models.Category.list();
+        if (categories.data) {
+          setRelatedCategories(categories.data.filter(category => categoryIds.includes(category.id)));
+        }
       }
     };
 
     fetchCategories();
-  }, [micropost.id, categories]);
+  }, [micropost.id]);
 
   return (
     <div className="detail-modal">
@@ -149,7 +151,7 @@ const MicropostDetail = ({ micropost, onClose, categories }: MicropostDetailProp
   );
 };
 
-const CategoryDetail = ({ category, onClose, microposts, categories }: CategoryDetailProps): JSX.Element => {
+const CategoryDetail = ({ category, onClose, microposts }: CategoryDetailProps): JSX.Element => {
   const [relatedMicroposts, setRelatedMicroposts] = useState<Array<Schema["Micropost"]["type"]>>([]);
 
   useEffect(() => {
@@ -412,7 +414,6 @@ const App = (): JSX.Element => {
           <MicropostDetail
             micropost={selectedMicropost}
             onClose={() => setSelectedMicropost(null)}
-            categories={categories}
           />
         )}
 
@@ -421,7 +422,6 @@ const App = (): JSX.Element => {
             category={selectedCategory}
             onClose={() => setSelectedCategory(null)}
             microposts={microposts}
-            categories={categories}
           />
         )}
 
