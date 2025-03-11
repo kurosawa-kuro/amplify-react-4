@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
+import { ConsoleLogger as Logger } from '@aws-amplify/core';
 import "./App.css";
 
 const client = generateClient<Schema>();
+const logger = new Logger('MicropostApp');
 
 // 型定義
 interface MicropostItemProps {
@@ -242,25 +244,25 @@ const App = (): JSX.Element => {
 
   // イベントハンドラー
   const handleCategoryToggle = (categoryId: string) => {
-    console.log('カテゴリー選択変更:', { categoryId });
+    logger.info('カテゴリー選択変更', { categoryId });
     setSelectedCategoryIds(prev => {
       const newSelection = prev.includes(categoryId)
         ? prev.filter(id => id !== categoryId)
         : [...prev, categoryId];
-      console.log('新しいカテゴリー選択状態:', newSelection);
+      logger.info('新しいカテゴリー選択状態', { newSelection });
       return newSelection;
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('マイクロポスト作成開始:', { title: newMicropost, selectedCategories: selectedCategoryIds });
+    logger.info('マイクロポスト作成開始', { title: newMicropost, selectedCategories: selectedCategoryIds });
     if (newMicropost.trim() && selectedCategoryIds.length > 0) {
       try {
         const newPost = await client.models.Micropost.create({ 
           title: newMicropost.trim()
         });
-        console.log('マイクロポスト作成成功:', newPost.data);
+        logger.info('マイクロポスト作成成功', { data: newPost.data });
 
         if (newPost.data?.id) {
           const categoryRelations = await Promise.all(
@@ -271,39 +273,39 @@ const App = (): JSX.Element => {
               })
             )
           );
-          console.log('カテゴリー関連付け完了:', categoryRelations);
+          logger.info('カテゴリー関連付け完了', { relations: categoryRelations });
         }
         setNewMicropost("");
         setSelectedCategoryIds([]);
       } catch (error) {
-        console.error("マイクロポストの作成に失敗しました:", error);
+        logger.error('マイクロポストの作成に失敗しました', { error });
       }
     }
   };
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('カテゴリー作成開始:', { name: newCategory });
+    logger.info('カテゴリー作成開始', { name: newCategory });
     if (newCategory.trim()) {
       try {
         const result = await client.models.Category.create({ 
           name: newCategory.trim()
         });
-        console.log('カテゴリー作成成功:', result.data);
+        logger.info('カテゴリー作成成功', { data: result.data });
         setNewCategory("");
       } catch (error) {
-        console.error("カテゴリーの作成に失敗しました:", error);
+        logger.error('カテゴリーの作成に失敗しました', { error });
       }
     }
   };
 
   const handleDeleteMicropost = async (micropost: Schema["Micropost"]["type"]) => {
-    console.log('マイクロポスト削除開始:', micropost);
+    logger.info('マイクロポスト削除開始', { micropost });
     try {
       const relations = await client.models.CategoryMicropost.list({
         filter: { micropostId: { eq: micropost.id } }
       });
-      console.log('関連カテゴリー取得:', relations.data);
+      logger.info('関連カテゴリー取得', { relations: relations.data });
       
       if (relations.data) {
         const deleteResults = await Promise.all(
@@ -313,15 +315,15 @@ const App = (): JSX.Element => {
             })
           )
         );
-        console.log('カテゴリー関連付け削除完了:', deleteResults);
+        logger.info('カテゴリー関連付け削除完了', { results: deleteResults });
       }
 
       const deleteResult = await client.models.Micropost.delete({
         id: micropost.id
       });
-      console.log('マイクロポスト削除完了:', deleteResult);
+      logger.info('マイクロポスト削除完了', { result: deleteResult });
     } catch (error) {
-      console.error("マイクロポストの削除に失敗しました:", error);
+      logger.error('マイクロポストの削除に失敗しました', { error });
     }
   };
 
