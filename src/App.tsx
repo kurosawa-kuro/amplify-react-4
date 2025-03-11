@@ -5,58 +5,55 @@ import "./App.css";
 
 const client = generateClient<Schema>();
 
-type FilterType = 'all' | 'active' | 'completed';
-
-interface TodoItemProps {
-  todo: Schema["Todo"]["type"];
-  onToggle: (todo: Schema["Todo"]["type"]) => Promise<void>;
+interface MicropostItemProps {
+  micropost: Schema["Micropost"]["type"];
+  onDelete: (micropost: Schema["Micropost"]["type"]) => Promise<void>;
 }
 
-const TodoItem = ({ todo, onToggle }: TodoItemProps): JSX.Element => (
+const MicropostItem = ({ micropost, onDelete }: MicropostItemProps): JSX.Element => (
   <li className="todo-item">
-    <input
-      type="checkbox"
-      onChange={() => onToggle(todo)}
-      className="todo-checkbox"
-      aria-label={`タスク: ${todo.content}`}
-    />
-    <span className={`todo-text ${todo.isDone ? "completed" : ""}`}>
-      {todo.content}
+    <span className="todo-text">
+      {micropost.title}
     </span>
+    <button
+      onClick={() => onDelete(micropost)}
+      className="delete-button"
+      aria-label="投稿を削除"
+    >
+      削除
+    </button>
   </li>
 );
 
-const TodoForm = ({ onSubmit, value, onChange }: {
+const MicropostForm = ({ onSubmit, value, onChange }: {
   onSubmit: (e: React.FormEvent) => void;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }): JSX.Element => (
   <form onSubmit={onSubmit} className="todo-form">
     <div className="todo-input-wrapper">
-      <span className="todo-input-circle"></span>
       <input
         type="text"
         value={value}
         onChange={onChange}
-        placeholder="Create a new todo.."
+        placeholder="新しい投稿を作成..."
         className="todo-input"
-        aria-label="新しいタスクの入力"
+        aria-label="新しい投稿の入力"
       />
     </div>
-    <button type="submit" className="todo-button" aria-label="タスクを追加">
-      Create
+    <button type="submit" className="todo-button" aria-label="投稿を作成">
+      投稿
     </button>
   </form>
 );
 
 const App = (): JSX.Element => {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
-  const [newTodo, setNewTodo] = useState("");
-  const [filter, setFilter] = useState<FilterType>("all");
+  const [microposts, setMicroposts] = useState<Array<Schema["Micropost"]["type"]>>([]);
+  const [newMicropost, setNewMicropost] = useState("");
 
   useEffect(() => {
-    const subscription = client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
+    const subscription = client.models.Micropost.observeQuery().subscribe({
+      next: (data) => setMicroposts([...data.items]),
     });
 
     return () => subscription.unsubscribe();
@@ -64,104 +61,55 @@ const App = (): JSX.Element => {
 
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    if (newTodo.trim()) {
-      client.models.Todo.create({ 
-        content: newTodo.trim(),
-        isDone: false 
+    if (newMicropost.trim()) {
+      client.models.Micropost.create({ 
+        title: newMicropost.trim()
       });
-      setNewTodo("");
+      setNewMicropost("");
     }
   };
 
-  const handleToggleTodo = async (todo: Schema["Todo"]["type"]): Promise<void> => {
-    await client.models.Todo.update({
-      id: todo.id,
-      isDone: !todo.isDone
+  const handleDeleteMicropost = async (micropost: Schema["Micropost"]["type"]): Promise<void> => {
+    await client.models.Micropost.delete({
+      id: micropost.id
     });
   };
-
-  const handleClearCompleted = async (): Promise<void> => {
-    const completedTodos = todos.filter(todo => todo.isDone);
-    await Promise.all(
-      completedTodos.map(todo => client.models.Todo.delete({ id: todo.id }))
-    );
-  };
-
-  const filteredTodos = todos.filter(todo => {
-    if (filter === "active") return !todo.isDone;
-    if (filter === "completed") return todo.isDone;
-    return true;
-  });
-
-  const activeTodosCount = todos.filter(todo => !todo.isDone).length;
 
   return (
     <div className="app">
       <main className="container">
         <div className="card">
           <div className="card-header">
-            <h1>TODO</h1>
+            <h1>マイクロポスト</h1>
           </div>
           
           <div className="card-body">
-            <TodoForm
+            <MicropostForm
               onSubmit={handleSubmit}
-              value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
+              value={newMicropost}
+              onChange={(e) => setNewMicropost(e.target.value)}
             />
 
-            {filteredTodos.length === 0 ? (
+            {microposts.length === 0 ? (
               <div className="todo-empty">
-                タスクがありません
+                投稿がありません
               </div>
             ) : (
               <ul className="todo-list">
-                {filteredTodos.map((todo) => (
-                  <TodoItem
-                    key={todo.id}
-                    todo={todo}
-                    onToggle={handleToggleTodo}
+                {microposts.map((micropost) => (
+                  <MicropostItem
+                    key={micropost.id}
+                    micropost={micropost}
+                    onDelete={handleDeleteMicropost}
                   />
                 ))}
               </ul>
             )}
-
-            <div className="filters">
-              <div className="filters-left">
-                {activeTodosCount} items left
-              </div>
-              <div className="filters-right">
-                <button
-                  className={`filter-button ${filter === 'all' ? 'active' : ''}`}
-                  onClick={() => setFilter('all')}
-                >
-                  All
-                </button>
-                <button
-                  className={`filter-button ${filter === 'active' ? 'active' : ''}`}
-                  onClick={() => setFilter('active')}
-                >
-                  Active
-                </button>
-                <button
-                  className={`filter-button ${filter === 'completed' ? 'active' : ''}`}
-                  onClick={() => setFilter('completed')}
-                >
-                  Completed
-                </button>
-                <button
-                  className="filter-button"
-                  onClick={handleClearCompleted}
-                >
-                  Clear Completed
-                </button>
-              </div>
-            </div>
           </div>
         </div>
 
         <footer className="footer">
-          <p>🎉 タスク管理アプリが正常に動作しています</p>
+          <p>🎉 マイクロポストアプリが正常に動作しています</p>
           <a 
             href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates"
             target="_blank"
