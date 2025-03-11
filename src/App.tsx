@@ -5,50 +5,13 @@ import "./App.css";
 
 const client = generateClient<Schema>();
 
+// 型定義
 interface MicropostItemProps {
   micropost: Schema["Micropost"]["type"];
   onDelete: (micropost: Schema["Micropost"]["type"]) => Promise<void>;
   onViewDetail: (micropost: Schema["Micropost"]["type"]) => void;
   categories: Array<Schema["Category"]["type"]>;
 }
-
-const MicropostItem = ({ 
-  micropost, 
-  onDelete,
-  onViewDetail,
-  categories
-}: MicropostItemProps): JSX.Element => (
-  <li className="todo-item">
-    <div className="micropost-content">
-      <span className="todo-text">
-        {micropost.title}
-      </span>
-      <div className="category-tags">
-        {categories.map(category => (
-          <span key={category.id} className="category-tag">
-            {category.name}
-          </span>
-        ))}
-      </div>
-    </div>
-    <div className="button-group">
-      <button
-        onClick={() => onViewDetail(micropost)}
-        className="view-button"
-        aria-label="詳細を表示"
-      >
-        詳細
-      </button>
-      <button
-        onClick={() => onDelete(micropost)}
-        className="delete-button"
-        aria-label="投稿を削除"
-      >
-        削除
-      </button>
-    </div>
-  </li>
-);
 
 interface MicropostFormProps {
   onSubmit: (e: React.FormEvent) => void;
@@ -59,14 +22,45 @@ interface MicropostFormProps {
   onCategoryChange: (categoryId: string) => void;
 }
 
-const MicropostForm = ({ 
-  onSubmit, 
-  value, 
-  onChange,
-  categories,
-  selectedCategoryIds,
-  onCategoryChange
-}: MicropostFormProps): JSX.Element => (
+interface CategoryFormProps {
+  onSubmit: (e: React.FormEvent) => void;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+interface DetailProps {
+  onClose: () => void;
+  categories: Array<Schema["Category"]["type"]>;
+}
+
+interface MicropostDetailProps extends DetailProps {
+  micropost: Schema["Micropost"]["type"];
+}
+
+interface CategoryDetailProps extends DetailProps {
+  category: Schema["Category"]["type"];
+  microposts: Array<Schema["Micropost"]["type"]>;
+}
+
+// コンポーネント
+const MicropostItem = ({ micropost, onDelete, onViewDetail, categories }: MicropostItemProps): JSX.Element => (
+  <li className="todo-item">
+    <div className="micropost-content">
+      <span className="todo-text">{micropost.title}</span>
+      <div className="category-tags">
+        {categories.map(category => (
+          <span key={category.id} className="category-tag">{category.name}</span>
+        ))}
+      </div>
+    </div>
+    <div className="button-group">
+      <button onClick={() => onViewDetail(micropost)} className="view-button" aria-label="詳細を表示">詳細</button>
+      <button onClick={() => onDelete(micropost)} className="delete-button" aria-label="投稿を削除">削除</button>
+    </div>
+  </li>
+);
+
+const MicropostForm = ({ onSubmit, value, onChange, categories, selectedCategoryIds, onCategoryChange }: MicropostFormProps): JSX.Element => (
   <form onSubmit={onSubmit} className="todo-form">
     <div className="form-row">
       <div className="todo-input-wrapper">
@@ -95,21 +89,11 @@ const MicropostForm = ({
         ))}
       </div>
     </div>
-    <button type="submit" className="todo-button" aria-label="投稿を作成">
-      投稿
-    </button>
+    <button type="submit" className="todo-button" aria-label="投稿を作成">投稿</button>
   </form>
 );
 
-const CategoryForm = ({ 
-  onSubmit,
-  value,
-  onChange
-}: {
-  onSubmit: (e: React.FormEvent) => void;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}): JSX.Element => (
+const CategoryForm = ({ onSubmit, value, onChange }: CategoryFormProps): JSX.Element => (
   <form onSubmit={onSubmit} className="category-form">
     <div className="todo-input-wrapper">
       <input
@@ -121,32 +105,17 @@ const CategoryForm = ({
         aria-label="新しいカテゴリーの入力"
       />
     </div>
-    <button type="submit" className="todo-button" aria-label="カテゴリーを作成">
-      作成
-    </button>
+    <button type="submit" className="todo-button" aria-label="カテゴリーを作成">作成</button>
   </form>
 );
 
-// 新しいコンポーネント: マイクロポスト詳細
-const MicropostDetail = ({ 
-  micropost, 
-  onClose,
-  categories
-}: { 
-  micropost: Schema["Micropost"]["type"];
-  onClose: () => void;
-  categories: Array<Schema["Category"]["type"]>;
-}): JSX.Element => {
+const MicropostDetail = ({ micropost, onClose, categories }: MicropostDetailProps): JSX.Element => {
   const [relatedCategories, setRelatedCategories] = useState<Array<Schema["Category"]["type"]>>([]);
 
   useEffect(() => {
     const fetchCategories = async () => {
       const relations = await client.models.CategoryMicropost.list({
-        filter: {
-          micropostId: {
-            eq: micropost.id
-          }
-        }
+        filter: { micropostId: { eq: micropost.id } }
       });
       
       if (relations.data) {
@@ -170,40 +139,23 @@ const MicropostDetail = ({
           <h3>カテゴリー</h3>
           <div className="category-list">
             {relatedCategories.map(category => (
-              <span key={category.id} className="category-tag">
-                {category.name}
-              </span>
+              <span key={category.id} className="category-tag">{category.name}</span>
             ))}
           </div>
         </div>
-        <button onClick={onClose} className="close-button">
-          閉じる
-        </button>
+        <button onClick={onClose} className="close-button">閉じる</button>
       </div>
     </div>
   );
 };
 
-// 新しいコンポーネント: カテゴリー詳細
-const CategoryDetail = ({ 
-  category, 
-  onClose,
-  microposts
-}: { 
-  category: Schema["Category"]["type"];
-  onClose: () => void;
-  microposts: Array<Schema["Micropost"]["type"]>;
-}): JSX.Element => {
+const CategoryDetail = ({ category, onClose, microposts, categories }: CategoryDetailProps): JSX.Element => {
   const [relatedMicroposts, setRelatedMicroposts] = useState<Array<Schema["Micropost"]["type"]>>([]);
 
   useEffect(() => {
     const fetchMicroposts = async () => {
       const relations = await client.models.CategoryMicropost.list({
-        filter: {
-          categoryId: {
-            eq: category.id
-          }
-        }
+        filter: { categoryId: { eq: category.id } }
       });
       
       if (relations.data) {
@@ -227,21 +179,18 @@ const CategoryDetail = ({
           <h3>関連するマイクロポスト</h3>
           <ul className="micropost-list">
             {relatedMicroposts.map(micropost => (
-              <li key={micropost.id} className="micropost-item">
-                {micropost.title}
-              </li>
+              <li key={micropost.id} className="micropost-item">{micropost.title}</li>
             ))}
           </ul>
         </div>
-        <button onClick={onClose} className="close-button">
-          閉じる
-        </button>
+        <button onClick={onClose} className="close-button">閉じる</button>
       </div>
     </div>
   );
 };
 
 const App = (): JSX.Element => {
+  // State管理
   const [microposts, setMicroposts] = useState<Array<Schema["Micropost"]["type"]>>([]);
   const [categories, setCategories] = useState<Array<Schema["Category"]["type"]>>([]);
   const [newMicropost, setNewMicropost] = useState("");
@@ -249,7 +198,9 @@ const App = (): JSX.Element => {
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [selectedMicropost, setSelectedMicropost] = useState<Schema["Micropost"]["type"] | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<Schema["Category"]["type"] | null>(null);
+  const [micropostCategories, setMicropostCategories] = useState<Record<string, Schema["Category"]["type"][]>>({});
 
+  // データ取得
   useEffect(() => {
     const micropostSubscription = client.models.Micropost.observeQuery().subscribe({
       next: (data) => setMicroposts([...data.items]),
@@ -265,6 +216,29 @@ const App = (): JSX.Element => {
     };
   }, []);
 
+  // カテゴリー情報の取得
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const categoriesMap: Record<string, Schema["Category"]["type"][]> = {};
+      
+      await Promise.all(
+        microposts.map(async (micropost) => {
+          const postCategories = await getCategoryForMicropost(micropost);
+          if (postCategories.length > 0) {
+            categoriesMap[micropost.id] = postCategories;
+          }
+        })
+      );
+      
+      setMicropostCategories(categoriesMap);
+    };
+
+    if (microposts.length > 0) {
+      fetchCategories();
+    }
+  }, [microposts, categories]);
+
+  // イベントハンドラー
   const handleCategoryToggle = (categoryId: string) => {
     setSelectedCategoryIds(prev => 
       prev.includes(categoryId)
@@ -273,14 +247,15 @@ const App = (): JSX.Element => {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent): void => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newMicropost.trim() && selectedCategoryIds.length > 0) {
-      client.models.Micropost.create({ 
-        title: newMicropost.trim()
-      }).then(async newPost => {
+      try {
+        const newPost = await client.models.Micropost.create({ 
+          title: newMicropost.trim()
+        });
+
         if (newPost.data?.id) {
-          // 選択された全てのカテゴリーに対して中間テーブルのレコードを作成
           await Promise.all(
             selectedCategoryIds.map(categoryId =>
               client.models.CategoryMicropost.create({
@@ -290,15 +265,15 @@ const App = (): JSX.Element => {
             )
           );
         }
-      }).catch(error => {
+        setNewMicropost("");
+        setSelectedCategoryIds([]);
+      } catch (error) {
         console.error("マイクロポストの作成に失敗しました:", error);
-      });
-      setNewMicropost("");
-      setSelectedCategoryIds([]);
+      }
     }
   };
 
-  const handleCategorySubmit = async (e: React.FormEvent): Promise<void> => {
+  const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newCategory.trim()) {
       try {
@@ -312,14 +287,10 @@ const App = (): JSX.Element => {
     }
   };
 
-  const handleDeleteMicropost = async (micropost: Schema["Micropost"]["type"]): Promise<void> => {
+  const handleDeleteMicropost = async (micropost: Schema["Micropost"]["type"]) => {
     try {
       const relations = await client.models.CategoryMicropost.list({
-        filter: {
-          micropostId: {
-            eq: micropost.id
-          }
-        }
+        filter: { micropostId: { eq: micropost.id } }
       });
       
       if (relations.data) {
@@ -343,11 +314,7 @@ const App = (): JSX.Element => {
   const getCategoryForMicropost = async (micropost: Schema["Micropost"]["type"]): Promise<Array<Schema["Category"]["type"]>> => {
     try {
       const relations = await client.models.CategoryMicropost.list({
-        filter: {
-          micropostId: {
-            eq: micropost.id
-          }
-        }
+        filter: { micropostId: { eq: micropost.id } }
       });
       
       if (!relations.data) return [];
@@ -360,29 +327,6 @@ const App = (): JSX.Element => {
       return [];
     }
   };
-
-  const [micropostCategories, setMicropostCategories] = useState<Record<string, Schema["Category"]["type"][]>>({});
-
-  useEffect(() => {
-    const fetchCategories = async () => {
-      const categoriesMap: Record<string, Schema["Category"]["type"][]> = {};
-      
-      await Promise.all(
-        microposts.map(async (micropost) => {
-          const postCategories = await getCategoryForMicropost(micropost);
-          if (postCategories.length > 0) {
-            categoriesMap[micropost.id] = postCategories;
-          }
-        })
-      );
-      
-      setMicropostCategories(categoriesMap);
-    };
-
-    if (microposts.length > 0) {
-      fetchCategories();
-    }
-  }, [microposts, categories]);
 
   return (
     <div className="app">
@@ -460,6 +404,7 @@ const App = (): JSX.Element => {
             category={selectedCategory}
             onClose={() => setSelectedCategory(null)}
             microposts={microposts}
+            categories={categories}
           />
         )}
 

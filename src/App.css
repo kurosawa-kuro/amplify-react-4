@@ -447,3 +447,29 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
+
+.micropost-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.micropost-item {
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.micropost-item:hover {
+  transform: translateY(-2px);
+  background: var(--hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
