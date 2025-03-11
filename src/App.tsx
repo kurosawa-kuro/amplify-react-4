@@ -7,29 +7,46 @@ const client = generateClient<Schema>();
 
 interface MicropostItemProps {
   micropost: Schema["Micropost"]["type"];
-  category?: Schema["Category"]["type"];
   onDelete: (micropost: Schema["Micropost"]["type"]) => Promise<void>;
+  onViewDetail: (micropost: Schema["Micropost"]["type"]) => void;
+  categories: Array<Schema["Category"]["type"]>;
 }
 
-const MicropostItem = ({ micropost, category, onDelete }: MicropostItemProps): JSX.Element => (
+const MicropostItem = ({ 
+  micropost, 
+  onDelete,
+  onViewDetail,
+  categories
+}: MicropostItemProps): JSX.Element => (
   <li className="todo-item">
     <div className="micropost-content">
       <span className="todo-text">
         {micropost.title}
       </span>
-      {category && (
-        <span className="category-tag">
-          {category.name}
-        </span>
-      )}
+      <div className="category-tags">
+        {categories.map(category => (
+          <span key={category.id} className="category-tag">
+            {category.name}
+          </span>
+        ))}
+      </div>
     </div>
-    <button
-      onClick={() => onDelete(micropost)}
-      className="delete-button"
-      aria-label="投稿を削除"
-    >
-      削除
-    </button>
+    <div className="button-group">
+      <button
+        onClick={() => onViewDetail(micropost)}
+        className="view-button"
+        aria-label="詳細を表示"
+      >
+        詳細
+      </button>
+      <button
+        onClick={() => onDelete(micropost)}
+        className="delete-button"
+        aria-label="投稿を削除"
+      >
+        削除
+      </button>
+    </div>
   </li>
 );
 
@@ -367,47 +384,6 @@ const App = (): JSX.Element => {
     }
   }, [microposts, categories]);
 
-  const MicropostItem = ({ 
-    micropost, 
-    onDelete,
-    onViewDetail
-  }: { 
-    micropost: Schema["Micropost"]["type"];
-    onDelete: (micropost: Schema["Micropost"]["type"]) => Promise<void>;
-    onViewDetail: (micropost: Schema["Micropost"]["type"]) => void;
-  }): JSX.Element => (
-    <li className="todo-item">
-      <div className="micropost-content">
-        <span className="todo-text">
-          {micropost.title}
-        </span>
-        <div className="category-tags">
-          {micropostCategories[micropost.id]?.map(category => (
-            <span key={category.id} className="category-tag">
-              {category.name}
-            </span>
-          ))}
-        </div>
-      </div>
-      <div className="button-group">
-        <button
-          onClick={() => onViewDetail(micropost)}
-          className="view-button"
-          aria-label="詳細を表示"
-        >
-          詳細
-        </button>
-        <button
-          onClick={() => onDelete(micropost)}
-          className="delete-button"
-          aria-label="投稿を削除"
-        >
-          削除
-        </button>
-      </div>
-    </li>
-  );
-
   return (
     <div className="app">
       <main className="container">
@@ -463,6 +439,7 @@ const App = (): JSX.Element => {
                     micropost={micropost}
                     onDelete={handleDeleteMicropost}
                     onViewDetail={setSelectedMicropost}
+                    categories={micropostCategories[micropost.id] || []}
                   />
                 ))}
               </ul>
