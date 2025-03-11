@@ -38,8 +38,8 @@ interface MicropostFormProps {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   categories: Array<Schema["Category"]["type"]>;
-  selectedCategoryId: string;
-  onCategoryChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  selectedCategoryIds: string[];
+  onCategoryChange: (categoryId: string) => void;
 }
 
 const MicropostForm = ({ 
@@ -47,7 +47,7 @@ const MicropostForm = ({
   value, 
   onChange,
   categories,
-  selectedCategoryId,
+  selectedCategoryIds,
   onCategoryChange
 }: MicropostFormProps): JSX.Element => (
   <form onSubmit={onSubmit} className="todo-form">
@@ -62,19 +62,21 @@ const MicropostForm = ({
           aria-label="新しい投稿の入力"
         />
       </div>
-      <select
-        value={selectedCategoryId}
-        onChange={onCategoryChange}
-        className="category-select"
-        aria-label="カテゴリーを選択"
-      >
-        <option value="">カテゴリーを選択</option>
+    </div>
+    <div className="category-selection">
+      <h3>カテゴリーを選択</h3>
+      <div className="category-checkboxes">
         {categories.map(category => (
-          <option key={category.id} value={category.id}>
+          <label key={category.id} className="category-checkbox">
+            <input
+              type="checkbox"
+              checked={selectedCategoryIds.includes(category.id)}
+              onChange={() => onCategoryChange(category.id)}
+            />
             {category.name}
-          </option>
+          </label>
         ))}
-      </select>
+      </div>
     </div>
     <button type="submit" className="todo-button" aria-label="投稿を作成">
       投稿
@@ -108,12 +110,128 @@ const CategoryForm = ({
   </form>
 );
 
+// 新しいコンポーネント: マイクロポスト詳細
+const MicropostDetail = ({ 
+  micropost, 
+  onClose,
+  categories
+}: { 
+  micropost: Schema["Micropost"]["type"];
+  onClose: () => void;
+  categories: Array<Schema["Category"]["type"]>;
+}): JSX.Element => {
+  const [relatedCategories, setRelatedCategories] = useState<Array<Schema["Category"]["type"]>>([]);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const relations = await client.models.CategoryMicropost.list({
+        filter: {
+          micropostId: {
+            eq: micropost.id
+          }
+        }
+      });
+      
+      if (relations.data) {
+        const categoryIds = relations.data.map(relation => relation.categoryId);
+        setRelatedCategories(categories.filter(category => categoryIds.includes(category.id)));
+      }
+    };
+
+    fetchCategories();
+  }, [micropost.id, categories]);
+
+  return (
+    <div className="detail-modal">
+      <div className="detail-content">
+        <h2>マイクロポスト詳細</h2>
+        <div className="detail-section">
+          <h3>タイトル</h3>
+          <p>{micropost.title}</p>
+        </div>
+        <div className="detail-section">
+          <h3>カテゴリー</h3>
+          <div className="category-list">
+            {relatedCategories.map(category => (
+              <span key={category.id} className="category-tag">
+                {category.name}
+              </span>
+            ))}
+          </div>
+        </div>
+        <button onClick={onClose} className="close-button">
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// 新しいコンポーネント: カテゴリー詳細
+const CategoryDetail = ({ 
+  category, 
+  onClose,
+  microposts
+}: { 
+  category: Schema["Category"]["type"];
+  onClose: () => void;
+  microposts: Array<Schema["Micropost"]["type"]>;
+}): JSX.Element => {
+  const [relatedMicroposts, setRelatedMicroposts] = useState<Array<Schema["Micropost"]["type"]>>([]);
+
+  useEffect(() => {
+    const fetchMicroposts = async () => {
+      const relations = await client.models.CategoryMicropost.list({
+        filter: {
+          categoryId: {
+            eq: category.id
+          }
+        }
+      });
+      
+      if (relations.data) {
+        const micropostIds = relations.data.map(relation => relation.micropostId);
+        setRelatedMicroposts(microposts.filter(micropost => micropostIds.includes(micropost.id)));
+      }
+    };
+
+    fetchMicroposts();
+  }, [category.id, microposts]);
+
+  return (
+    <div className="detail-modal">
+      <div className="detail-content">
+        <h2>カテゴリー詳細</h2>
+        <div className="detail-section">
+          <h3>名前</h3>
+          <p>{category.name}</p>
+        </div>
+        <div className="detail-section">
+          <h3>関連するマイクロポスト</h3>
+          <ul className="micropost-list">
+            {relatedMicroposts.map(micropost => (
+              <li key={micropost.id} className="micropost-item">
+                {micropost.title}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <button onClick={onClose} className="close-button">
+          閉じる
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const App = (): JSX.Element => {
   const [microposts, setMicroposts] = useState<Array<Schema["Micropost"]["type"]>>([]);
   const [categories, setCategories] = useState<Array<Schema["Category"]["type"]>>([]);
   const [newMicropost, setNewMicropost] = useState("");
   const [newCategory, setNewCategory] = useState("");
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [selectedMicropost, setSelectedMicropost] = useState<Schema["Micropost"]["type"] | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<Schema["Category"]["type"] | null>(null);
 
   useEffect(() => {
     const micropostSubscription = client.models.Micropost.observeQuery().subscribe({
@@ -130,23 +248,36 @@ const App = (): JSX.Element => {
     };
   }, []);
 
+  const handleCategoryToggle = (categoryId: string) => {
+    setSelectedCategoryIds(prev => 
+      prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
-    if (newMicropost.trim() && selectedCategoryId) {
+    if (newMicropost.trim() && selectedCategoryIds.length > 0) {
       client.models.Micropost.create({ 
         title: newMicropost.trim()
-      }).then(newPost => {
+      }).then(async newPost => {
         if (newPost.data?.id) {
-          client.models.CategoryMicropost.create({
-            categoryId: selectedCategoryId,
-            micropostId: newPost.data.id
-          });
+          // 選択された全てのカテゴリーに対して中間テーブルのレコードを作成
+          await Promise.all(
+            selectedCategoryIds.map(categoryId =>
+              client.models.CategoryMicropost.create({
+                categoryId,
+                micropostId: newPost.data!.id
+              })
+            )
+          );
         }
       }).catch(error => {
         console.error("マイクロポストの作成に失敗しました:", error);
       });
       setNewMicropost("");
-      setSelectedCategoryId("");
+      setSelectedCategoryIds([]);
     }
   };
 
@@ -236,9 +367,14 @@ const App = (): JSX.Element => {
     }
   }, [microposts, categories]);
 
-  const MicropostItem = ({ micropost, onDelete }: { 
+  const MicropostItem = ({ 
+    micropost, 
+    onDelete,
+    onViewDetail
+  }: { 
     micropost: Schema["Micropost"]["type"];
     onDelete: (micropost: Schema["Micropost"]["type"]) => Promise<void>;
+    onViewDetail: (micropost: Schema["Micropost"]["type"]) => void;
   }): JSX.Element => (
     <li className="todo-item">
       <div className="micropost-content">
@@ -253,13 +389,22 @@ const App = (): JSX.Element => {
           ))}
         </div>
       </div>
-      <button
-        onClick={() => onDelete(micropost)}
-        className="delete-button"
-        aria-label="投稿を削除"
-      >
-        削除
-      </button>
+      <div className="button-group">
+        <button
+          onClick={() => onViewDetail(micropost)}
+          className="view-button"
+          aria-label="詳細を表示"
+        >
+          詳細
+        </button>
+        <button
+          onClick={() => onDelete(micropost)}
+          className="delete-button"
+          aria-label="投稿を削除"
+        >
+          削除
+        </button>
+      </div>
     </li>
   );
 
@@ -279,6 +424,19 @@ const App = (): JSX.Element => {
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value)}
               />
+              <div className="category-list">
+                {categories.map(category => (
+                  <div key={category.id} className="category-item">
+                    <span>{category.name}</span>
+                    <button
+                      onClick={() => setSelectedCategory(category)}
+                      className="view-button"
+                    >
+                      詳細
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="micropost-section">
@@ -288,8 +446,8 @@ const App = (): JSX.Element => {
                 value={newMicropost}
                 onChange={(e) => setNewMicropost(e.target.value)}
                 categories={categories}
-                selectedCategoryId={selectedCategoryId}
-                onCategoryChange={(e) => setSelectedCategoryId(e.target.value)}
+                selectedCategoryIds={selectedCategoryIds}
+                onCategoryChange={handleCategoryToggle}
               />
             </div>
 
@@ -304,12 +462,29 @@ const App = (): JSX.Element => {
                     key={micropost.id}
                     micropost={micropost}
                     onDelete={handleDeleteMicropost}
+                    onViewDetail={setSelectedMicropost}
                   />
                 ))}
               </ul>
             )}
           </div>
         </div>
+
+        {selectedMicropost && (
+          <MicropostDetail
+            micropost={selectedMicropost}
+            onClose={() => setSelectedMicropost(null)}
+            categories={categories}
+          />
+        )}
+
+        {selectedCategory && (
+          <CategoryDetail
+            category={selectedCategory}
+            onClose={() => setSelectedCategory(null)}
+            microposts={microposts}
+          />
+        )}
 
         <footer className="footer">
           <p>🎉 マイクロポストアプリが正常に動作しています</p>
