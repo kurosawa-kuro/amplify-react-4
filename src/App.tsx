@@ -134,8 +134,16 @@ const App = (): JSX.Element => {
     e.preventDefault();
     if (newMicropost.trim() && selectedCategoryId) {
       client.models.Micropost.create({ 
-        title: newMicropost.trim(),
-        categoryID: selectedCategoryId
+        title: newMicropost.trim()
+      }).then(newPost => {
+        if (newPost.data?.id) {
+          client.models.CategoryMicropost.create({
+            categoryId: selectedCategoryId,
+            micropostId: newPost.data.id
+          });
+        }
+      }).catch(error => {
+        console.error("マイクロポストの作成に失敗しました:", error);
       });
       setNewMicropost("");
       setSelectedCategoryId("");
@@ -157,14 +165,103 @@ const App = (): JSX.Element => {
   };
 
   const handleDeleteMicropost = async (micropost: Schema["Micropost"]["type"]): Promise<void> => {
-    await client.models.Micropost.delete({
-      id: micropost.id
-    });
+    try {
+      const relations = await client.models.CategoryMicropost.list({
+        filter: {
+          micropostId: {
+            eq: micropost.id
+          }
+        }
+      });
+      
+      if (relations.data) {
+        await Promise.all(
+          relations.data.map(relation => 
+            client.models.CategoryMicropost.delete({
+              id: relation.id
+            })
+          )
+        );
+      }
+
+      await client.models.Micropost.delete({
+        id: micropost.id
+      });
+    } catch (error) {
+      console.error("マイクロポストの削除に失敗しました:", error);
+    }
   };
 
-  const getCategoryForMicropost = (micropost: Schema["Micropost"]["type"]) => {
-    return categories.find(category => category.id === micropost.categoryID);
+  const getCategoryForMicropost = async (micropost: Schema["Micropost"]["type"]): Promise<Array<Schema["Category"]["type"]>> => {
+    try {
+      const relations = await client.models.CategoryMicropost.list({
+        filter: {
+          micropostId: {
+            eq: micropost.id
+          }
+        }
+      });
+      
+      if (!relations.data) return [];
+      
+      return relations.data
+        .map(relation => categories.find(category => category.id === relation.categoryId))
+        .filter((category): category is Schema["Category"]["type"] => category !== undefined);
+    } catch (error) {
+      console.error("カテゴリー情報の取得に失敗しました:", error);
+      return [];
+    }
   };
+
+  const [micropostCategories, setMicropostCategories] = useState<Record<string, Schema["Category"]["type"][]>>({});
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      const categoriesMap: Record<string, Schema["Category"]["type"][]> = {};
+      
+      await Promise.all(
+        microposts.map(async (micropost) => {
+          const postCategories = await getCategoryForMicropost(micropost);
+          if (postCategories.length > 0) {
+            categoriesMap[micropost.id] = postCategories;
+          }
+        })
+      );
+      
+      setMicropostCategories(categoriesMap);
+    };
+
+    if (microposts.length > 0) {
+      fetchCategories();
+    }
+  }, [microposts, categories]);
+
+  const MicropostItem = ({ micropost, onDelete }: { 
+    micropost: Schema["Micropost"]["type"];
+    onDelete: (micropost: Schema["Micropost"]["type"]) => Promise<void>;
+  }): JSX.Element => (
+    <li className="todo-item">
+      <div className="micropost-content">
+        <span className="todo-text">
+          {micropost.title}
+        </span>
+        <div className="category-tags">
+          {micropostCategories[micropost.id]?.map(category => (
+            <span key={category.id} className="category-tag">
+              {category.name}
+            </span>
+          ))}
+        </div>
+      </div>
+      <button
+        onClick={() => onDelete(micropost)}
+        className="delete-button"
+        aria-label="投稿を削除"
+      >
+        削除
+      </button>
+    </li>
+  );
 
   return (
     <div className="app">
@@ -206,7 +303,6 @@ const App = (): JSX.Element => {
                   <MicropostItem
                     key={micropost.id}
                     micropost={micropost}
-                    category={getCategoryForMicropost(micropost)}
                     onDelete={handleDeleteMicropost}
                   />
                 ))}

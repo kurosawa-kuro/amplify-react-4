@@ -10,15 +10,23 @@ const schema = a.schema({
   Category: a
     .model({
       name: a.string().required(),
-      microposts: a.hasMany("Micropost", "categoryID"),
+      microposts: a.hasMany("CategoryMicropost", "categoryId"),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 
   Micropost: a
     .model({
       title: a.string().required(),
-      categoryID: a.string(),
-      category: a.belongsTo("Category", "categoryID"),
+      categories: a.hasMany("CategoryMicropost", "micropostId"),
+    })
+    .authorization((allow) => [allow.publicApiKey()]),
+
+  CategoryMicropost: a
+    .model({
+      categoryId: a.string().required(),
+      micropostId: a.string().required(),
+      category: a.belongsTo("Category", "categoryId"),
+      micropost: a.belongsTo("Micropost", "micropostId"),
     })
     .authorization((allow) => [allow.publicApiKey()]),
 });
