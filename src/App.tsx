@@ -242,23 +242,28 @@ const App = (): JSX.Element => {
 
   // イベントハンドラー
   const handleCategoryToggle = (categoryId: string) => {
-    setSelectedCategoryIds(prev => 
-      prev.includes(categoryId)
+    console.log('カテゴリー選択変更:', { categoryId });
+    setSelectedCategoryIds(prev => {
+      const newSelection = prev.includes(categoryId)
         ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    );
+        : [...prev, categoryId];
+      console.log('新しいカテゴリー選択状態:', newSelection);
+      return newSelection;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('マイクロポスト作成開始:', { title: newMicropost, selectedCategories: selectedCategoryIds });
     if (newMicropost.trim() && selectedCategoryIds.length > 0) {
       try {
         const newPost = await client.models.Micropost.create({ 
           title: newMicropost.trim()
         });
+        console.log('マイクロポスト作成成功:', newPost.data);
 
         if (newPost.data?.id) {
-          await Promise.all(
+          const categoryRelations = await Promise.all(
             selectedCategoryIds.map(categoryId =>
               client.models.CategoryMicropost.create({
                 categoryId,
@@ -266,6 +271,7 @@ const App = (): JSX.Element => {
               })
             )
           );
+          console.log('カテゴリー関連付け完了:', categoryRelations);
         }
         setNewMicropost("");
         setSelectedCategoryIds([]);
@@ -277,11 +283,13 @@ const App = (): JSX.Element => {
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('カテゴリー作成開始:', { name: newCategory });
     if (newCategory.trim()) {
       try {
-        await client.models.Category.create({ 
+        const result = await client.models.Category.create({ 
           name: newCategory.trim()
         });
+        console.log('カテゴリー作成成功:', result.data);
         setNewCategory("");
       } catch (error) {
         console.error("カテゴリーの作成に失敗しました:", error);
@@ -290,24 +298,28 @@ const App = (): JSX.Element => {
   };
 
   const handleDeleteMicropost = async (micropost: Schema["Micropost"]["type"]) => {
+    console.log('マイクロポスト削除開始:', micropost);
     try {
       const relations = await client.models.CategoryMicropost.list({
         filter: { micropostId: { eq: micropost.id } }
       });
+      console.log('関連カテゴリー取得:', relations.data);
       
       if (relations.data) {
-        await Promise.all(
+        const deleteResults = await Promise.all(
           relations.data.map(relation => 
             client.models.CategoryMicropost.delete({
               id: relation.id
             })
           )
         );
+        console.log('カテゴリー関連付け削除完了:', deleteResults);
       }
 
-      await client.models.Micropost.delete({
+      const deleteResult = await client.models.Micropost.delete({
         id: micropost.id
       });
+      console.log('マイクロポスト削除完了:', deleteResult);
     } catch (error) {
       console.error("マイクロポストの削除に失敗しました:", error);
     }

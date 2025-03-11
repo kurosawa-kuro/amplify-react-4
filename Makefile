@@ -10,7 +10,7 @@ install:
 sandbox:
 	npx ampx sandbox
 
-reset-sandbox:
+sandbox-reset:
 	npx ampx sandbox delete -y
 	rm -rf .amplify
 	npx ampx sandbox
