@@ -1,20 +1,68 @@
 import { useEffect, useState } from "react";
 import type { Schema } from "../amplify/data/resource";
 import { generateClient } from "aws-amplify/data";
+import "./App.css";
 
 const client = generateClient<Schema>();
 
-function App() {
+type FilterType = 'all' | 'active' | 'completed';
+
+interface TodoItemProps {
+  todo: Schema["Todo"]["type"];
+  onToggle: (todo: Schema["Todo"]["type"]) => Promise<void>;
+}
+
+const TodoItem = ({ todo, onToggle }: TodoItemProps): JSX.Element => (
+  <li className="todo-item">
+    <input
+      type="checkbox"
+      onChange={() => onToggle(todo)}
+      className="todo-checkbox"
+      aria-label={`タスク: ${todo.content}`}
+    />
+    <span className={`todo-text ${todo.isDone ? "completed" : ""}`}>
+      {todo.content}
+    </span>
+  </li>
+);
+
+const TodoForm = ({ onSubmit, value, onChange }: {
+  onSubmit: (e: React.FormEvent) => void;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}): JSX.Element => (
+  <form onSubmit={onSubmit} className="todo-form">
+    <div className="todo-input-wrapper">
+      <span className="todo-input-circle"></span>
+      <input
+        type="text"
+        value={value}
+        onChange={onChange}
+        placeholder="Create a new todo.."
+        className="todo-input"
+        aria-label="新しいタスクの入力"
+      />
+    </div>
+    <button type="submit" className="todo-button" aria-label="タスクを追加">
+      Create
+    </button>
+  </form>
+);
+
+const App = (): JSX.Element => {
   const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
   const [newTodo, setNewTodo] = useState("");
+  const [filter, setFilter] = useState<FilterType>("all");
 
   useEffect(() => {
-    client.models.Todo.observeQuery().subscribe({
+    const subscription = client.models.Todo.observeQuery().subscribe({
       next: (data) => setTodos([...data.items]),
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
     if (newTodo.trim()) {
       client.models.Todo.create({ 
@@ -25,62 +73,106 @@ function App() {
     }
   };
 
-  const toggleTodo = async (todo: Schema["Todo"]["type"]) => {
+  const handleToggleTodo = async (todo: Schema["Todo"]["type"]): Promise<void> => {
     await client.models.Todo.update({
       id: todo.id,
       isDone: !todo.isDone
     });
   };
 
-  return (
-    <main className="max-w-2xl mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">My todos</h1>
-      
-      <form onSubmit={handleSubmit} className="mb-6">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={newTodo}
-            onChange={(e) => setNewTodo(e.target.value)}
-            placeholder="新しいタスクを入力"
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            追加
-          </button>
-        </div>
-      </form>
+  const handleClearCompleted = async (): Promise<void> => {
+    const completedTodos = todos.filter(todo => todo.isDone);
+    await Promise.all(
+      completedTodos.map(todo => client.models.Todo.delete({ id: todo.id }))
+    );
+  };
 
-      <ul className="space-y-2">
-        {todos.map((todo) => (
-          <li 
-            key={todo.id}
-            className="flex items-center gap-2 p-3 bg-white rounded-lg shadow"
-          >
-            <input
-              type="checkbox"
-              checked={todo.isDone}
-              onChange={() => toggleTodo(todo)}
-              className="w-5 h-5"
+  const filteredTodos = todos.filter(todo => {
+    if (filter === "active") return !todo.isDone;
+    if (filter === "completed") return todo.isDone;
+    return true;
+  });
+
+  const activeTodosCount = todos.filter(todo => !todo.isDone).length;
+
+  return (
+    <div className="app">
+      <main className="container">
+        <div className="card">
+          <div className="card-header">
+            <h1>TODO</h1>
+          </div>
+          
+          <div className="card-body">
+            <TodoForm
+              onSubmit={handleSubmit}
+              value={newTodo}
+              onChange={(e) => setNewTodo(e.target.value)}
             />
-            <span className={todo.isDone ? "line-through text-gray-500" : ""}>
-              {todo.content}
-            </span>
-          </li>
-        ))}
-      </ul>
-      <div>
-        🥳 App successfully hosted. Try creating a new todo.
-        <br />
-        <a href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates">
-          Review next step of this tutorial.
-        </a>
-      </div>
-    </main>
+
+            {filteredTodos.length === 0 ? (
+              <div className="todo-empty">
+                タスクがありません
+              </div>
+            ) : (
+              <ul className="todo-list">
+                {filteredTodos.map((todo) => (
+                  <TodoItem
+                    key={todo.id}
+                    todo={todo}
+                    onToggle={handleToggleTodo}
+                  />
+                ))}
+              </ul>
+            )}
+
+            <div className="filters">
+              <div className="filters-left">
+                {activeTodosCount} items left
+              </div>
+              <div className="filters-right">
+                <button
+                  className={`filter-button ${filter === 'all' ? 'active' : ''}`}
+                  onClick={() => setFilter('all')}
+                >
+                  All
+                </button>
+                <button
+                  className={`filter-button ${filter === 'active' ? 'active' : ''}`}
+                  onClick={() => setFilter('active')}
+                >
+                  Active
+                </button>
+                <button
+                  className={`filter-button ${filter === 'completed' ? 'active' : ''}`}
+                  onClick={() => setFilter('completed')}
+                >
+                  Completed
+                </button>
+                <button
+                  className="filter-button"
+                  onClick={handleClearCompleted}
+                >
+                  Clear Completed
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <footer className="footer">
+          <p>🎉 タスク管理アプリが正常に動作しています</p>
+          <a 
+            href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            チュートリアルの次のステップを確認する
+          </a>
+        </footer>
+      </main>
+    </div>
   );
-}
+};
 
 export default App;
