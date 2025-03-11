@@ -408,6 +408,16 @@ const App = (): JSX.Element => {
           />
         )}
 
+        <div style={{ textAlign: 'center', margin: '2rem 0' }}>
+          <button
+            onClick={() => console.log("カスタムボタンがクリックされました")}
+            className="todo-button"
+            style={{ backgroundColor: 'var(--success)' }}
+          >
+            カスタム
+          </button>
+        </div>
+
         <footer className="footer">
           <p>🎉 マイクロポストアプリが正常に動作しています</p>
           <a 
